@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Zerodha Market Heatmap — Preview</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet" />
+<style>
+  body{font-family:system-ui,-apple-system,sans-serif;background:#f8fafc;margin:0}
+  .heat-major-bear{background:#450a0a;color:#fecaca;border-color:#991b1b}
+  .heat-med-bear{background:#991b1b;color:#fef2f2;border-color:#dc2626}
+  .heat-slight-bear{background:#fff7ed;color:#9a3412;border-color:#fdba74}
+  .heat-sideways{background:#fefce8;color:#92400e;border-color:#fde68a}
+  .heat-slight-bull{background:#ecfdf5;color:#065f46;border-color:#6ee7b7}
+  .heat-med-bull{background:#34d399;color:#064e3b;border-color:#059669}
+  .heat-major-bull{background:#065f46;color:#ecfdf5;border-color:#064e3b}
+  .badge-major-bear{background:rgba(127,29,29,.8);color:#fecaca}
+  .badge-med-bear{background:rgba(185,28,28,.8);color:#fef2f2}
+  .badge-slight-bear{background:rgba(253,186,116,.6);color:#9a3412}
+  .badge-sideways{background:rgba(253,230,138,.6);color:#92400e}
+  .badge-slight-bull{background:rgba(110,231,183,.6);color:#065f46}
+  .badge-med-bull{background:rgba(5,150,105,.8);color:#ecfdf5}
+  .badge-major-bull{background:rgba(6,78,59,.8);color:#ecfdf5}
+  .tf-active{background:#fff;color:#1e293b;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .tf-btn{padding:6px 14px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all .15s}
+  .tf-btn:not(.tf-active){background:transparent;color:#64748b}
+  .tf-btn:not(.tf-active):hover{color:#334155}
+  .grp-active{background:#fff;color:#1e293b;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .grp-btn{padding:8px 18px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s}
+  .grp-btn:not(.grp-active){background:transparent;color:#64748b}
+  .card{border-radius:16px;border:1px solid;padding:16px;transition:all .2s}
+  .card:hover{transform:scale(1.01);box-shadow:0 4px 12px rgba(0,0,0,.06)}
+  .stat-card{background:#fff;border-radius:16px;padding:16px;border:1px solid #f1f5f9;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .icon-box{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center}
+  input,select{height:36px;border-radius:12px;border:1px solid #e2e8f0;padding:0 12px;font-size:12px;outline:none;background:#fff}
+  input:focus{border-color:#93c5fd;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+  .view-btn{padding:6px;border-radius:10px;cursor:pointer;border:none;transition:all .15s}
+  .view-active{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.08);color:#1e293b}
+  .view-btn:not(.view-active){background:transparent;color:#94a3b8}
+  .badge{border-radius:999px;padding:2px 10px;font-size:10px;font-weight:600;white-space:nowrap}
+  .scroll-x{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+  .scroll-x::-webkit-scrollbar{display:none}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .spin{animation:spin 1s linear infinite}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState, useMemo, useEffect, useCallback, useRef} = React;
+
+const TIMEFRAMES = [
+  {value:"5m",label:"5 Min",short:"5m"},
+  {value:"15m",label:"15 Min",short:"15m"},
+  {value:"1h",label:"1 Hour",short:"1h"},
+  {value:"4h",label:"4 Hour",short:"4h"},
+  {value:"1d",label:"1 Day",short:"1d"},
+  {value:"1w",label:"1 Week",short:"1w"},
+];
+
+const GROUPS = [
+  {key:"nifty20",label:"NIFTY 20",short:"N20"},
+  {key:"nifty50",label:"NIFTY 50",short:"N50"},
+  {key:"banking50",label:"Banking 50",short:"BNK"},
+  {key:"midcap50",label:"Mid Cap 50",short:"MID"},
+  {key:"smallcap50",label:"Small Cap 50",short:"SML"},
+];
+
+const SORT_OPTIONS = [
+  {value:"change_desc",label:"Top Gainers"},
+  {value:"change_asc",label:"Top Losers"},
+  {value:"alpha",label:"A → Z"},
+];
+
+function getHeat(pct) {
+  if(pct<=-3) return {cls:"heat-major-bear",badge:"badge-major-bear",label:"Major Bear"};
+  if(pct<=-1.5) return {cls:"heat-med-bear",badge:"badge-med-bear",label:"Med Bear"};
+  if(pct<=-0.4) return {cls:"heat-slight-bear",badge:"badge-slight-bear",label:"Slight Bear"};
+  if(pct<0.4) return {cls:"heat-sideways",badge:"badge-sideways",label:"Sideways"};
+  if(pct<1.5) return {cls:"heat-slight-bull",badge:"badge-slight-bull",label:"Slight Bull"};
+  if(pct<3) return {cls:"heat-med-bull",badge:"badge-med-bull",label:"Med Bull"};
+  return {cls:"heat-major-bull",badge:"badge-major-bull",label:"Major Bull"};
+}
+
+function fmt(n){return Number(n||0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}
+function fmtVol(n){if(!n)return"—";if(n>=1e7)return(n/1e7).toFixed(2)+" Cr";if(n>=1e5)return(n/1e5).toFixed(2)+" L";if(n>=1e3)return(n/1e3).toFixed(1)+"K";return n.toString()}
+
+function TrendIcon({v}){
+  if(v>0.05) return <span style={{color:"#10b981"}}>▲</span>;
+  if(v<-0.05) return <span style={{color:"#ef4444"}}>▼</span>;
+  return <span style={{color:"#f59e0b"}}>—</span>;
+}
+
+// Generate realistic demo data
+function makeDemoData(){
+  const nifty20 = [
+    {s:"RELIANCE",n:"Reliance Industries",b:2964},
+    {s:"TCS",n:"Tata Consultancy",b:4120},
+    {s:"HDFCBANK",n:"HDFC Bank",b:1681},
+    {s:"ICICIBANK",n:"ICICI Bank",b:1285},
+    {s:"INFY",n:"Infosys",b:1822},
+    {s:"HINDUNILVR",n:"Hindustan Unilever",b:2340},
+    {s:"ITC",n:"ITC Ltd",b:458},
+    {s:"SBIN",n:"State Bank of India",b:812},
+    {s:"BHARTIARTL",n:"Bharti Airtel",b:1745},
+    {s:"KOTAKBANK",n:"Kotak Mahindra Bank",b:1920},
+    {s:"LT",n:"Larsen & Toubro",b:3560},
+    {s:"AXISBANK",n:"Axis Bank",b:1180},
+    {s:"BAJFINANCE",n:"Bajaj Finance",b:7250},
+    {s:"ASIANPAINT",n:"Asian Paints",b:2380},
+    {s:"MARUTI",n:"Maruti Suzuki",b:12800},
+    {s:"HCLTECH",n:"HCL Technologies",b:1920},
+    {s:"SUNPHARMA",n:"Sun Pharma",b:1840},
+    {s:"TITAN",n:"Titan Company",b:3320},
+    {s:"ULTRACEMCO",n:"UltraTech Cement",b:11200},
+    {s:"WIPRO",n:"Wipro",b:298},
+  ];
+
+  function makeStock(sym,name,base){
+    const seed=(Math.random()-0.48)*4;
+    const ltp=base*(1+seed/100);
+    const o=base*(1+(seed*0.3)/100);
+    const h=Math.max(ltp,o)*(1+Math.random()*0.005);
+    const l=Math.min(ltp,o)*(1-Math.random()*0.005);
+    const vol=Math.floor(Math.random()*5e6)+1e5;
+    return {
+      symbol:sym,name,ltp:+ltp.toFixed(2),open:+o.toFixed(2),high:+h.toFixed(2),low:+l.toFixed(2),volume:vol,
+      changes:{
+        "5m":+(seed*0.15+((Math.random()-0.5)*0.3)).toFixed(3),
+        "15m":+(seed*0.3+((Math.random()-0.5)*0.4)).toFixed(3),
+        "1h":+(seed*0.6+((Math.random()-0.5)*0.5)).toFixed(3),
+        "4h":+(seed*0.9+((Math.random()-0.5)*0.6)).toFixed(3),
+        "1d":+(seed*1.2+((Math.random()-0.5)*0.8)).toFixed(3),
+        "1w":+(seed*2+((Math.random()-0.5)*1.2)).toFixed(3),
+      }
+    };
+  }
+
+  const n20=nifty20.map(x=>makeStock(x.s,x.n,x.b));
+  const bankNames=["BANKBARODA","PNB","CANBK","UNIONBANK","IDFCFIRSTB","FEDERALBNK","BANDHANBNK","AUBANK","RBLBANK","IDBI","INDIANB","IOB","CENTRALBK","UCOBANK","MAHABANK","PSB","BANKINDIA","J&KBANK","CUB","TMB","KVB","CSB","DCBBANK","EQUITASBNK","UJJIVANSFB","SURYODAY","ESAFSFB","UTKARSHBNK","FINOPB","NUVAMA","MANAPPURAM","MUTHOOTFIN","CHOLAFIN","SHRIRAMFIN","M&MFIN","LICHSGFIN","POONAWALLA","IIFL","SUNDARMFIN","HDFCAMC","CAMS","CDSL","BAJFINANCE","BAJAJFINSV","HDFCBANK","ICICIBANK","SBIN","KOTAKBANK","AXISBANK","INDUSINDBK"];
+  const midNames=["TATAELXSI","MPHASIS","PERSISTENT","COFORGE","LTTS","VOLTAS","PAGEIND","PIIND","ASTRAL","POLYCAB","DEEPAKNTR","ATUL","NAVINFLUOR","SYNGENE","LALPATHLAB","MAXHEALTH","FORTIS","JUBLFOOD","TATACOMM","OBEROIRLTY","PRESTIGE","GODREJPROP","PHOENIXLTD","BRIGADE","CUMMINSIND","ABB","SIEMENS","BHEL","THERMAX","KAYNES","DIXON","AFFLE","ZOMATO","PAYTM","NYKAA","POLICYBZR","DELHIVERY","HAPPSTMNDS","KPITTECH","SONACOMS","SCHAEFFLER","TIMKEN","SKFINDIA","FIVESTAR","CREDITACC","MASFIN","AAVAS","CANFINHOME","METROPOLIS","IPCALAB"];
+  const smlNames=["CAMPUS","BIKAJI","DATAPATTNS","LATENTVIEW","MEDPLUS","RAINBOW","TANLA","ROUTE","MASTERTRUST","RATEGAIN","ZAGGLE","YATHARTH","NETWEB","CELLO","GPIL","JYOTICNC","DOMS","EASEMYTRIP","IRCTC","RVNL","IRFC","RAILTEL","RITES","IRCON","HUDCO","NHPC","SJVN","RECLTD","PFC","TATAPOWER","ADANIGREEN","ADANIENSOL","SUZLON","INOXWIND","BOROSIL","VGUARD","HAVELLS","CROMPTON","BAJAJELEC","ORIENTELEC","AMBER","BLUESTARLT","AIAENG","GRINDWELL","SAPPHIRE","SIGNATURE","AVALON","UPDATERPTY","AZAD","GOKEX"];
+
+  const makeGroup=(names)=>names.map(s=>makeStock(s,s+" Ltd",100+Math.random()*3000));
+  const n50extra=["ADANIENT","ADANIPORTS","APOLLOHOSP","BAJAJ-AUTO","BAJAJFINSV","BPCL","BRITANNIA","CIPLA","COALINDIA","DIVISLAB","DRREDDY","EICHERMOT","GRASIM","HDFCLIFE","HEROMOTOCO","HINDALCO","INDUSINDBK","JSWSTEEL","M&M","NESTLEIND","NTPC","ONGC","POWERGRID","SBILIFE","TATACONSUM","TATAMOTORS","TATASTEEL","TECHM","TRENT","WIPRO"];
+
+  return {
+    connected:false,
+    lastUpdated:new Date().toISOString(),
+    tickCount:0,
+    groups:{
+      nifty20:n20,
+      nifty50:[...n20,...n50extra.map(s=>makeStock(s,s+" Ltd",500+Math.random()*2000))].slice(0,50),
+      banking50:makeGroup(bankNames),
+      midcap50:makeGroup(midNames),
+      smallcap50:makeGroup(smlNames),
+    }
+  };
+}
+
+function StatCard({icon,title,value,sub,color}){
+  return (
+    <div className="stat-card">
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <div className="icon-box" style={{background:color+"15",color}}>{icon}</div>
+        <span style={{fontSize:12,fontWeight:500,color:"#64748b"}}>{title}</span>
+      </div>
+      <div style={{marginTop:8,fontSize:24,fontWeight:700,color:"#0f172a"}}>{value}</div>
+      {sub && <div style={{marginTop:4,fontSize:11,color:"#94a3b8"}}>{sub}</div>}
+    </div>
+  );
+}
+
+function StockCard({stock,timeframe,view}){
+  const ch=stock.changes?.[timeframe]??0;
+  const heat=getHeat(ch);
+  if(view==="compact"){
+    return (
+      <div className={`card ${heat.cls}`} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px",marginBottom:4}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,minWidth:0}}>
+          <span style={{fontWeight:700,fontSize:13}}>{stock.symbol}</span>
+          <span style={{fontSize:11,opacity:.7,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{stock.name}</span>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:16,flexShrink:0}}>
+          <span style={{fontSize:13,fontWeight:600}}>₹{fmt(stock.ltp)}</span>
+          <span style={{fontSize:13,fontWeight:700,minWidth:80,textAlign:"right"}}>
+            <TrendIcon v={ch}/> {ch>0?"+":""}{ch.toFixed(2)}%
+          </span>
+          <span className={`badge ${heat.badge}`}>{heat.label}</span>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className={`card ${heat.cls}`}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+        <div style={{minWidth:0}}>
+          <div style={{fontSize:13,fontWeight:700,letterSpacing:.5}}>{stock.symbol}</div>
+          <div style={{fontSize:11,opacity:.7,marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{stock.name}</div>
+        </div>
+        <span className={`badge ${heat.badge}`}>{heat.label}</span>
+      </div>
+      <div style={{marginTop:16,display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
+        <div>
+          <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:1,opacity:.5}}>LTP</div>
+          <div style={{fontSize:20,fontWeight:700}}>₹{fmt(stock.ltp)}</div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:16,fontWeight:700}}>
+            <TrendIcon v={ch}/> {ch>0?"+":""}{ch.toFixed(2)}%
+          </div>
+        </div>
+      </div>
+      <div style={{marginTop:12,paddingTop:10,borderTop:"1px solid rgba(128,128,128,.15)",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
+        {[{l:"Open",v:stock.open},{l:"High",v:stock.high},{l:"Low",v:stock.low},{l:"Vol",v:null,vol:stock.volume}].map(x=>(
+          <div key={x.l} style={{textAlign:"center"}}>
+            <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:.8,opacity:.45}}>{x.l}</div>
+            <div style={{fontSize:11,fontWeight:600,marginTop:2}}>{x.vol!==undefined?fmtVol(x.vol):"₹"+fmt(x.v)}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HeatLegend(){
+  const items=[
+    {l:"Major Bear",c:"badge-major-bear"},
+    {l:"Med Bear",c:"badge-med-bear"},
+    {l:"Slight Bear",c:"badge-slight-bear"},
+    {l:"Sideways",c:"badge-sideways"},
+    {l:"Slight Bull",c:"badge-slight-bull"},
+    {l:"Med Bull",c:"badge-med-bull"},
+    {l:"Major Bull",c:"badge-major-bull"},
+  ];
+  return (
+    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+      {items.map(i=><span key={i.l} className={`badge ${i.c}`} style={{padding:"4px 12px"}}>{i.l}</span>)}
+    </div>
+  );
+}
+
+function App(){
+  const [data,setData]=useState(()=>makeDemoData());
+  const [timeframe,setTimeframe]=useState("1d");
+  const [group,setGroup]=useState("nifty20");
+  const [query,setQuery]=useState("");
+  const [sort,setSort]=useState("change_desc");
+  const [view,setView]=useState("grid");
+  const [isLive,setIsLive]=useState(false);
+  const [loading,setLoading]=useState(false);
+  const wsRef=useRef(null);
+  const pollRef=useRef(null);
+
+  // Try connecting to backend
+  useEffect(()=>{
+    async function tryConnect(){
+      try{
+        const res=await fetch("/auth/status");
+        const json=await res.json();
+        if(json.connected){
+          setIsLive(true);
+          fetchData();
+          connectWs();
+        }
+      }catch(e){
+        // Backend not running — stay in demo mode
+      }
+    }
+    tryConnect();
+    return ()=>{wsRef.current?.close();if(pollRef.current)clearInterval(pollRef.current)};
+  },[]);
+
+  function fetchData(){
+    fetch("/api/market/overview").then(r=>r.json()).then(j=>{setData(j);setIsLive(j.connected)}).catch(()=>{});
+  }
+
+  function connectWs(){
+    try{
+      const ws=new WebSocket(`${location.protocol==="https:"?"wss":"ws"}://${location.host}/ws/market`);
+      ws.onmessage=(e)=>{try{const j=JSON.parse(e.data);setData(j);setIsLive(j.connected)}catch(e){}};
+      ws.onclose=()=>{pollRef.current=setInterval(fetchData,5000);setTimeout(connectWs,3000)};
+      ws.onerror=()=>ws.close();
+      wsRef.current=ws;
+      if(pollRef.current){clearInterval(pollRef.current);pollRef.current=null;}
+    }catch(e){}
+  }
+
+  function handleRefresh(){
+    setLoading(true);
+    if(isLive){
+      fetchData();
+      setTimeout(()=>setLoading(false),500);
+    }else{
+      setData(makeDemoData());
+      setTimeout(()=>setLoading(false),300);
+    }
+  }
+
+  function handleLogin(){
+    window.location.href="/auth/login";
+  }
+
+  const stocks=data?.groups?.[group]??[];
+  const filtered=useMemo(()=>{
+    let list=stocks.filter(s=>`${s.symbol} ${s.name}`.toLowerCase().includes(query.toLowerCase()));
+    list.sort((a,b)=>{
+      const ca=a.changes?.[timeframe]??0, cb=b.changes?.[timeframe]??0;
+      if(sort==="change_desc")return cb-ca;
+      if(sort==="change_asc")return ca-cb;
+      if(sort==="alpha")return a.symbol.localeCompare(b.symbol);
+      return cb-ca;
+    });
+    return list;
+  },[stocks,query,sort,timeframe]);
+
+  const summary=useMemo(()=>{
+    const vals=stocks.map(s=>s.changes?.[timeframe]??0);
+    const green=vals.filter(v=>v>=0.4).length;
+    const red=vals.filter(v=>v<=-0.4).length;
+    const side=vals.length-green-red;
+    const avg=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0;
+    return {green,red,side,avg,total:vals.length};
+  },[stocks,timeframe]);
+
+  return (
+    <div style={{minHeight:"100vh",background:"#f8fafc"}}>
+      {/* Header */}
+      <header style={{position:"sticky",top:0,zIndex:30,background:"rgba(255,255,255,.85)",backdropFilter:"blur(16px)",borderBottom:"1px solid #f1f5f9",boxShadow:"0 1px 2px rgba(0,0,0,.04)"}}>
+        <div style={{maxWidth:1600,margin:"0 auto",padding:"12px 20px"}}>
+          <div style={{display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:12}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:40,height:40,borderRadius:12,background:"#2563eb",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:700,fontSize:18}}>H</div>
+              <div>
+                <h1 style={{fontSize:18,fontWeight:700,color:"#0f172a",margin:0,lineHeight:1.2}}>Market Heatmap</h1>
+                <div style={{fontSize:11,color:"#94a3b8",display:"flex",alignItems:"center",gap:6}}>
+                  <span style={{color:isLive?"#10b981":"#f59e0b"}}>{isLive?"● Live":"● Demo Mode"}</span>
+                  {!isLive && <button onClick={handleLogin} style={{background:"none",border:"none",color:"#2563eb",cursor:"pointer",fontSize:11,fontWeight:600,textDecoration:"underline"}}>Connect Zerodha →</button>}
+                </div>
+              </div>
+            </div>
+
+            <div style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:8}}>
+              <div style={{display:"flex",background:"#f1f5f9",borderRadius:12,padding:3,gap:2}} className="scroll-x">
+                {TIMEFRAMES.map(tf=>(
+                  <button key={tf.value} className={`tf-btn ${timeframe===tf.value?"tf-active":""}`} onClick={()=>setTimeframe(tf.value)}>{tf.short}</button>
+                ))}
+              </div>
+              <div style={{position:"relative"}}>
+                <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"#94a3b8",fontSize:13}}>🔍</span>
+                <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search..." style={{paddingLeft:32,width:160}}/>
+              </div>
+              <select value={sort} onChange={e=>setSort(e.target.value)}>
+                {SORT_OPTIONS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <div style={{display:"flex",background:"#f1f5f9",borderRadius:12,padding:3}}>
+                <button className={`view-btn ${view==="grid"?"view-active":""}`} onClick={()=>setView("grid")}>▦</button>
+                <button className={`view-btn ${view==="compact"?"view-active":""}`} onClick={()=>setView("compact")}>☰</button>
+              </div>
+              <button onClick={handleRefresh} style={{width:36,height:36,borderRadius:12,border:"1px solid #e2e8f0",background:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#64748b",fontSize:14}} title="Refresh">
+                <span className={loading?"spin":""}>↻</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main */}
+      <main style={{maxWidth:1600,margin:"0 auto",padding:"24px 20px"}}>
+        {/* Stats */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,marginBottom:24}}>
+          <StatCard icon="▲" title="Advancing" value={summary.green} sub={`of ${summary.total} stocks`} color="#10b981"/>
+          <StatCard icon="▼" title="Declining" value={summary.red} sub={`of ${summary.total} stocks`} color="#ef4444"/>
+          <StatCard icon="—" title="Sideways" value={summary.side} sub="±0.4% band" color="#f59e0b"/>
+          <StatCard icon="⚡" title="Avg Move" value={`${summary.avg>0?"+":""}${summary.avg.toFixed(2)}%`} sub={TIMEFRAMES.find(t=>t.value===timeframe)?.label} color="#3b82f6"/>
+        </div>
+
+        {/* Legend + Group tabs */}
+        <div style={{background:"#fff",borderRadius:16,padding:16,border:"1px solid #f1f5f9",marginBottom:24,boxShadow:"0 1px 2px rgba(0,0,0,.04)"}}>
+          <div style={{display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:12}}>
+            <HeatLegend/>
+            <div style={{display:"flex",background:"#f1f5f9",borderRadius:12,padding:3,gap:2}} className="scroll-x">
+              {GROUPS.map(g=>(
+                <button key={g.key} className={`grp-btn ${group===g.key?"grp-active":""}`} onClick={()=>setGroup(g.key)}>{g.label}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Cards */}
+        {filtered.length===0?(
+          <div style={{background:"#fff",borderRadius:16,padding:48,textAlign:"center",color:"#94a3b8",border:"1px solid #f1f5f9"}}>
+            <div style={{fontSize:28,marginBottom:8}}>🔍</div>
+            <div style={{fontWeight:600}}>No stocks found</div>
+            <div style={{fontSize:12,marginTop:4}}>{query?"Try a different search term":"Waiting for data..."}</div>
+          </div>
+        ):view==="compact"?(
+          <div>{filtered.map(s=><StockCard key={group+"-"+s.symbol} stock={s} timeframe={timeframe} view="compact"/>)}</div>
+        ):(
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:12}}>
+            {filtered.map(s=><StockCard key={group+"-"+s.symbol} stock={s} timeframe={timeframe} view="grid"/>)}
+          </div>
+        )}
+      </main>
+
+      <footer style={{borderTop:"1px solid #f1f5f9",padding:16,textAlign:"center",fontSize:11,color:"#94a3b8"}}>
+        Zerodha Market Heatmap · {isLive?"Live via Kite Connect":"Demo Mode — Connect Zerodha for live data"} · 2026
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

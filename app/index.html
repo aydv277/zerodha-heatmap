@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#0f172a"/>
+<title>Market Heatmap</title>
+<link rel="manifest" href="manifest.json"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0f172a;--surface:#1e293b;--surface2:#334155;
+  --text:#f1f5f9;--text2:#94a3b8;--text3:#64748b;
+  --border:#334155;
+  --major-bear-bg:#7f1d1d;--major-bear-text:#fecaca;
+  --med-bear-bg:#991b1b;--med-bear-text:#fef2f2;
+  --slight-bear-bg:#c2410c;--slight-bear-text:#fff7ed;
+  --sideways-bg:#a16207;--sideways-text:#fefce8;
+  --slight-bull-bg:#15803d;--slight-bull-text:#ecfdf5;
+  --med-bull-bg:#059669;--med-bull-text:#ecfdf5;
+  --major-bull-bg:#047857;--major-bull-text:#ecfdf5;
+}
+body{
+  font-family:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;
+  background:var(--bg);color:var(--text);
+  -webkit-tap-highlight-color:transparent;
+  overflow-x:hidden;
+}
+
+/* Header */
+.header{
+  position:sticky;top:0;z-index:50;
+  background:var(--bg);border-bottom:1px solid var(--border);
+  padding:12px 16px 0;
+}
+.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.logo{font-size:16px;font-weight:800;letter-spacing:-.3px}
+.status{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2)}
+.status-dot{width:7px;height:7px;border-radius:50%}
+.status-dot.live{background:#22c55e;box-shadow:0 0 6px #22c55e}
+.status-dot.off{background:#ef4444}
+.status-dot.connecting{background:#f59e0b;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.btn{
+  background:none;border:1px solid var(--border);color:var(--text2);
+  height:32px;border-radius:8px;cursor:pointer;font-size:12px;
+  display:flex;align-items:center;justify-content:center;padding:0 12px;gap:6px;
+}
+.btn-primary{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinning{animation:spin .8s linear infinite;display:inline-block}
+
+/* Tabs */
+.tabs{
+  display:flex;gap:0;overflow-x:auto;scrollbar-width:none;
+  margin:0 -16px;padding:0 16px;
+}
+.tabs::-webkit-scrollbar{display:none}
+.tab{
+  flex-shrink:0;padding:8px 16px;font-size:12px;font-weight:600;
+  color:var(--text3);cursor:pointer;border:none;background:none;
+  border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;
+}
+.tab.active{color:var(--text);border-bottom-color:#3b82f6}
+
+/* Summary */
+.summary{
+  display:flex;gap:2px;padding:10px 16px;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  overflow-x:auto;scrollbar-width:none;
+}
+.summary::-webkit-scrollbar{display:none}
+.summary-item{flex:1;min-width:70px;text-align:center;padding:6px 4px;border-radius:8px}
+.summary-val{font-size:16px;font-weight:700}
+.summary-lbl{font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+
+/* Table */
+.table-wrap{
+  overflow-x:auto;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  max-height:calc(100vh - 170px);max-height:calc(100dvh - 170px);
+}
+table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}
+thead{position:sticky;top:0;z-index:10}
+thead th{
+  background:var(--surface);color:var(--text2);
+  font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px;
+  padding:8px 6px;border-bottom:1px solid var(--border);text-align:center;white-space:nowrap;
+}
+thead th:first-child{
+  text-align:left;position:sticky;left:0;z-index:11;
+  background:var(--surface);min-width:90px;width:90px;padding-left:12px;
+}
+thead th:nth-child(2){
+  text-align:right;position:sticky;left:90px;z-index:11;
+  background:var(--surface);min-width:80px;width:80px;
+}
+tbody tr{border-bottom:1px solid rgba(51,65,85,.4)}
+td{padding:7px 6px;text-align:center;white-space:nowrap}
+td:first-child{
+  position:sticky;left:0;z-index:5;background:var(--bg);text-align:left;padding-left:12px;
+  font-weight:700;font-size:11px;letter-spacing:.3px;min-width:90px;width:90px;
+}
+td:nth-child(2){
+  position:sticky;left:90px;z-index:5;background:var(--bg);text-align:right;
+  font-weight:600;font-size:11px;color:var(--text2);min-width:80px;width:80px;padding-right:8px;
+}
+.cell{
+  font-weight:700;font-size:11px;border-radius:4px;
+  padding:4px 2px;margin:0 1px;display:block;min-width:52px;
+}
+.c-major-bear{background:var(--major-bear-bg);color:var(--major-bear-text)}
+.c-med-bear{background:var(--med-bear-bg);color:var(--med-bear-text)}
+.c-slight-bear{background:var(--slight-bear-bg);color:var(--slight-bear-text)}
+.c-sideways{background:var(--sideways-bg);color:var(--sideways-text)}
+.c-slight-bull{background:var(--slight-bull-bg);color:var(--slight-bull-text)}
+.c-med-bull{background:var(--med-bull-bg);color:var(--med-bull-text)}
+.c-major-bull{background:var(--major-bull-bg);color:var(--major-bull-text)}
+
+/* Shadow on sticky cols */
+td:nth-child(2)::after,thead th:nth-child(2)::after{
+  content:'';position:absolute;top:0;right:-6px;bottom:0;width:6px;
+  background:linear-gradient(to right,rgba(15,23,42,.3),transparent);pointer-events:none;
+}
+
+/* Legend */
+.legend{
+  display:flex;justify-content:center;gap:3px;padding:8px 16px;
+  flex-wrap:wrap;border-top:1px solid var(--border);
+}
+.legend-item{font-size:8px;font-weight:600;padding:3px 8px;border-radius:4px}
+
+/* Login / Empty states */
+.state-screen{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:60vh;padding:32px;text-align:center;
+}
+.state-screen h2{font-size:20px;font-weight:700;margin-bottom:8px}
+.state-screen p{font-size:13px;color:var(--text2);line-height:1.5;max-width:320px;margin-bottom:20px}
+.last-updated{font-size:10px;color:var(--text3);text-align:center;padding:6px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────────────────
+// When deploying to Hostinger, set these to your backend URL:
+// e.g. const API_BASE = "https://your-domain.com";
+//      const WS_BASE  = "wss://your-domain.com";
+const API_BASE = "";
+const WS_BASE  = "";
+const POLL_INTERVAL = 3000;
+
+const GROUPS = [
+  { key: "nifty20",    label: "NIFTY 20" },
+  { key: "nifty50",    label: "NIFTY 50" },
+  { key: "banking50",  label: "BankNifty 20" },
+  { key: "midcap50",   label: "MidCap 20" },
+  { key: "smallcap50", label: "SmallCap 20" },
+];
+
+const TFS = ["5m","15m","1h","4h","1d","1w"];
+const TF_LABELS = {"5m":"5M","15m":"15M","1h":"1H","4h":"4H","1d":"1D","1w":"1W"};
+
+// ── HEAT COLOR ──────────────────────────────────────────────────────────────
+function heatClass(pct) {
+  if (pct <= -3)   return "c-major-bear";
+  if (pct <= -1.5) return "c-med-bear";
+  if (pct <= -0.4) return "c-slight-bear";
+  if (pct < 0.4)   return "c-sideways";
+  if (pct < 1.5)   return "c-slight-bull";
+  if (pct < 3)     return "c-med-bull";
+  return "c-major-bull";
+}
+
+function fmtPct(v) {
+  const n = Number(v || 0);
+  return (n > 0 ? "+" : "") + n.toFixed(2) + "%";
+}
+
+function fmtPrice(v) {
+  return Number(v || 0).toLocaleString("en-IN", { maximumFractionDigits: 1 });
+}
+
+// ── STATE (no fake data — only real data from backend) ──────────────────────
+let state = {
+  data: null,          // null = no data yet
+  group: "nifty20",
+  status: "checking",  // checking | not_connected | connected | error
+  loading: false,
+  error: null,
+  lastUpdated: null,
+};
+
+let ws = null;
+let pollId = null;
+
+function setState(patch) {
+  Object.assign(state, patch);
+  render();
+}
+
+// ── API ─────────────────────────────────────────────────────────────────────
+async function checkAuth() {
+  setState({ status: "checking" });
+  try {
+    const r = await fetch(API_BASE + "/auth/status");
+    const j = await r.json();
+    if (j.connected) {
+      setState({ status: "connected" });
+      fetchData();
+      connectWs();
+    } else {
+      setState({ status: "not_connected" });
+    }
+  } catch (e) {
+    setState({ status: "error", error: "Backend not reachable. Make sure the server is running." });
+  }
+}
+
+async function fetchData() {
+  try {
+    const r = await fetch(API_BASE + "/api/market/overview");
+    if (!r.ok) throw new Error("API returned " + r.status);
+    const j = await r.json();
+    setState({
+      data: j,
+      status: j.connected ? "connected" : "not_connected",
+      lastUpdated: j.lastUpdated || new Date().toISOString(),
+    });
+  } catch (e) {
+    console.error("Fetch error:", e);
+  }
+}
+
+function connectWs() {
+  try {
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    const base = WS_BASE || (proto + "://" + location.host);
+    ws = new WebSocket(base + "/ws/market");
+    ws.onmessage = function(e) {
+      try {
+        const j = JSON.parse(e.data);
+        setState({
+          data: j,
+          status: j.connected ? "connected" : "not_connected",
+          lastUpdated: j.lastUpdated || new Date().toISOString(),
+        });
+      } catch (err) {}
+    };
+    ws.onclose = function() {
+      ws = null;
+      if (!pollId) pollId = setInterval(fetchData, POLL_INTERVAL);
+      setTimeout(connectWs, 3000);
+    };
+    ws.onerror = function() { ws.close(); };
+    if (pollId) { clearInterval(pollId); pollId = null; }
+  } catch (e) {}
+}
+
+function handleRefresh() {
+  setState({ loading: true });
+  fetchData().finally(function() { setState({ loading: false }); });
+}
+
+function handleLogin() {
+  window.location.href = API_BASE + "/auth/login";
+}
+
+// ── RENDER ──────────────────────────────────────────────────────────────────
+function render() {
+  var s = state;
+  var app = document.getElementById("app");
+
+  // ── No backend / not logged in states ─────────────────────────────────
+  if (s.status === "checking") {
+    app.innerHTML = '<div class="state-screen"><div class="spinning" style="font-size:28px;margin-bottom:16px">↻</div><h2>Connecting...</h2><p>Checking backend connection and Zerodha session...</p></div>';
+    return;
+  }
+
+  if (s.status === "error") {
+    app.innerHTML = '<div class="state-screen"><div style="font-size:36px;margin-bottom:16px">⚠️</div><h2>Backend Offline</h2><p>' + (s.error || "Cannot reach the backend server.") + '</p><button class="btn btn-primary" onclick="checkAuth()">Retry</button></div>';
+    return;
+  }
+
+  if (s.status === "not_connected" && !s.data) {
+    app.innerHTML = '<div class="state-screen"><div style="font-size:36px;margin-bottom:16px">🔐</div><h2>Login Required</h2><p>Connect your Zerodha account to stream real-time market data. No fake data — only live prices.</p><button class="btn btn-primary" onclick="handleLogin()" style="height:44px;padding:0 28px;font-size:14px">Login with Zerodha</button><p style="margin-top:16px;font-size:11px;color:var(--text3)">Uses Kite Connect API. Credentials never touch this app.</p></div>';
+    return;
+  }
+
+  // ── Has data — render table ───────────────────────────────────────────
+  var stocks = (s.data && s.data.groups && s.data.groups[s.group]) || [];
+  var isLive = s.status === "connected";
+
+  // Summary from 1D changes
+  var vals = stocks.map(function(x) { return (x.changes && x.changes["1d"]) || 0; });
+  var adv = vals.filter(function(v) { return v >= 0.4; }).length;
+  var dec = vals.filter(function(v) { return v <= -0.4; }).length;
+  var side = vals.length - adv - dec;
+  var avg = vals.length ? vals.reduce(function(a, b) { return a + b; }, 0) / vals.length : 0;
+
+  var html = '';
+
+  // Header
+  html += '<div class="header"><div class="header-top">';
+  html += '<div style="display:flex;align-items:center;gap:10px">';
+  html += '<div class="logo">📊 Heatmap</div>';
+  html += '<div class="status"><span class="status-dot ' + (isLive ? 'live' : 'off') + '"></span>' + (isLive ? 'Live' : 'Waiting for ticks') + '</div>';
+  html += '</div>';
+  html += '<div style="display:flex;gap:8px;align-items:center">';
+  if (!isLive) html += '<button class="btn" onclick="handleLogin()">Re-login</button>';
+  html += '<button class="btn" onclick="handleRefresh()"><span class="' + (s.loading ? 'spinning' : '') + '" style="display:inline-block">↻</span></button>';
+  html += '</div></div>';
+
+  // Tabs
+  html += '<div class="tabs">';
+  GROUPS.forEach(function(g) {
+    html += '<button class="tab ' + (s.group === g.key ? 'active' : '') + '" onclick="setState({group:\'' + g.key + '\'})">' + g.label + '</button>';
+  });
+  html += '</div></div>';
+
+  // Summary
+  html += '<div class="summary">';
+  html += '<div class="summary-item" style="color:#22c55e"><div class="summary-val">' + adv + '</div><div class="summary-lbl">Advance</div></div>';
+  html += '<div class="summary-item" style="color:#ef4444"><div class="summary-val">' + dec + '</div><div class="summary-lbl">Decline</div></div>';
+  html += '<div class="summary-item" style="color:#f59e0b"><div class="summary-val">' + side + '</div><div class="summary-lbl">Sideways</div></div>';
+  html += '<div class="summary-item" style="color:#60a5fa"><div class="summary-val">' + (avg > 0 ? '+' : '') + avg.toFixed(2) + '%</div><div class="summary-lbl">Avg 1D</div></div>';
+  html += '</div>';
+
+  // Table
+  if (stocks.length === 0) {
+    html += '<div class="state-screen" style="min-height:40vh"><div style="font-size:28px;margin-bottom:12px">📡</div><h2>Waiting for Data</h2><p>Market data will appear here once ticks start flowing from Zerodha. Make sure the market is open (9:15 AM — 3:30 PM IST).</p></div>';
+  } else {
+    html += '<div class="table-wrap"><table><thead><tr>';
+    html += '<th>Stock</th><th>LTP</th>';
+    TFS.forEach(function(tf) { html += '<th>' + TF_LABELS[tf] + '</th>'; });
+    html += '</tr></thead><tbody>';
+
+    stocks.forEach(function(stock) {
+      html += '<tr>';
+      html += '<td>' + stock.symbol + '</td>';
+      html += '<td>₹' + fmtPrice(stock.ltp) + '</td>';
+      TFS.forEach(function(tf) {
+        var v = (stock.changes && stock.changes[tf]) || 0;
+        html += '<td><span class="cell ' + heatClass(v) + '">' + fmtPct(v) + '</span></td>';
+      });
+      html += '</tr>';
+    });
+
+    html += '</tbody></table></div>';
+  }
+
+  // Legend
+  html += '<div class="legend">';
+  html += '<span class="legend-item c-major-bear">≤-3%</span>';
+  html += '<span class="legend-item c-med-bear">-3 to -1.5%</span>';
+  html += '<span class="legend-item c-slight-bear">-1.5 to -0.4%</span>';
+  html += '<span class="legend-item c-sideways">±0.4%</span>';
+  html += '<span class="legend-item c-slight-bull">+0.4 to +1.5%</span>';
+  html += '<span class="legend-item c-med-bull">+1.5 to +3%</span>';
+  html += '<span class="legend-item c-major-bull">≥+3%</span>';
+  html += '</div>';
+
+  // Last updated
+  if (s.lastUpdated) {
+    var d = new Date(s.lastUpdated);
+    html += '<div class="last-updated">Last updated: ' + d.toLocaleTimeString("en-IN") + '</div>';
+  }
+
+  app.innerHTML = html;
+}
+
+// ── INIT ────────────────────────────────────────────────────────────────────
+render();
+checkAuth();
+</script>
+</body>
+</html>

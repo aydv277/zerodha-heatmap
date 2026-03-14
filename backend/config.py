@@ -1,0 +1,79 @@
+"""Centralised configuration loaded from .env"""
+
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).parent / ".env")
+
+KITE_API_KEY: str = os.getenv("KITE_API_KEY", "")
+KITE_API_SECRET: str = os.getenv("KITE_API_SECRET", "")
+REDIRECT_URL: str = os.getenv("REDIRECT_URL", "http://localhost:8000/auth/callback")
+FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+# Instrument tokens for each group — updated on first successful login
+# These are NSE instrument tokens that Kite uses for tick subscriptions.
+# The backend will auto-resolve symbols → tokens after login.
+
+NIFTY_20_SYMBOLS = [
+    "RELIANCE", "TCS", "HDFCBANK", "ICICIBANK", "INFY",
+    "HINDUNILVR", "ITC", "SBIN", "BHARTIARTL", "KOTAKBANK",
+    "LT", "AXISBANK", "BAJFINANCE", "ASIANPAINT", "MARUTI",
+    "HCLTECH", "SUNPHARMA", "TITAN", "ULTRACEMCO", "WIPRO",
+]
+
+NIFTY_50_SYMBOLS = NIFTY_20_SYMBOLS + [
+    "ADANIENT", "ADANIPORTS", "APOLLOHOSP", "BAJAJ-AUTO", "BAJAJFINSV",
+    "BPCL", "BRITANNIA", "CIPLA", "COALINDIA", "DIVISLAB",
+    "DRREDDY", "EICHERMOT", "GRASIM", "HDFCLIFE", "HEROMOTOCO",
+    "HINDALCO", "INDUSINDBK", "JSWSTEEL", "M&M", "NESTLEIND",
+    "NTPC", "ONGC", "POWERGRID", "SBILIFE", "TATACONSUM",
+    "TATAMOTORS", "TATASTEEL", "TECHM", "TRENT", "WIPRO",
+]
+
+BANKING_SYMBOLS = [
+    "HDFCBANK", "ICICIBANK", "SBIN", "KOTAKBANK", "AXISBANK",
+    "INDUSINDBK", "BANKBARODA", "PNB", "CANBK", "UNIONBANK",
+    "IDFCFIRSTB", "FEDERALBNK", "BANDHANBNK", "AUBANK", "RBLBANK",
+    "IDBI", "INDIANB", "IOB", "CENTRALBK", "UCOBANK",
+    "MAHABANK", "PSB", "BANKINDIA", "J&KBANK", "CUB",
+    "TMB", "KVB", "CSB", "DCBBANK", "EQUITASBNK",
+    "UJJIVANSFB", "SURYODAY", "ESAFSFB", "UTKARSHBNK", "FINOPB",
+    "NUVAMA", "MANAPPURAM", "MUTHOOTFIN", "BAJFINANCE", "BAJAJFINSV",
+    "CHOLAFIN", "SHRIRAMFIN", "M&MFIN", "LICHSGFIN", "POONAWALLA",
+    "IIFL", "SUNDARMFIN", "HDFCAMC", "CAMS", "CDSL",
+]
+
+MIDCAP_SYMBOLS = [
+    "TATAELXSI", "MPHASIS", "PERSISTENT", "COFORGE", "LTTS",
+    "VOLTAS", "PAGEIND", "PIIND", "ASTRAL", "POLYCAB",
+    "DEEPAKNTR", "ATUL", "NAVINFLUOR", "SYNGENE", "LALPATHLAB",
+    "MAXHEALTH", "FORTIS", "JUBLFOOD", "TATACOMM", "OBEROIRLTY",
+    "PRESTIGE", "GODREJPROP", "PHOENIXLTD", "BRIGADE", "CUMMINSIND",
+    "ABB", "SIEMENS", "BHEL", "THERMAX", "KAYNES",
+    "DIXON", "AFFLE", "ZOMATO", "PAYTM", "NYKAA",
+    "POLICYBZR", "DELHIVERY", "HAPPSTMNDS", "KPITTECH", "SONACOMS",
+    "SCHAEFFLER", "TIMKEN", "SKFINDIA", "FIVESTAR", "CREDITACC",
+    "MASFIN", "AAVAS", "CANFINHOME", "METROPOLIS", "IPCALAB",
+]
+
+SMALLCAP_SYMBOLS = [
+    "CAMPUS", "GOKEX", "BIKAJI", "DATAPATTNS", "LATENTVIEW",
+    "MEDPLUS", "RAINBOW", "TANLA", "ROUTE", "MASTERTRUST",
+    "RATEGAIN", "SAPPHIRE", "ZAGGLE", "YATHARTH", "SIGNATURE",
+    "NETWEB", "CELLO", "AVALON", "UPDATERPTY", "GPIL",
+    "JYOTICNC", "DOMS", "AZAD", "EASEMYTRIP", "IRCTC",
+    "RVNL", "IRFC", "RAILTEL", "RITES", "IRCON",
+    "HUDCO", "NHPC", "SJVN", "RECLTD", "PFC",
+    "TATAPOWER", "ADANIGREEN", "ADANIENSOL", "SUZLON", "INOXWIND",
+    "BOROSIL", "VGUARD", "HAVELLS", "CROMPTON", "BAJAJELEC",
+    "ORIENTELEC", "AMBER", "BLUESTARLT", "AIAENG", "GRINDWELL",
+]
+
+ALL_GROUPS = {
+    "nifty20": NIFTY_20_SYMBOLS,
+    "nifty50": NIFTY_50_SYMBOLS,
+    "banking50": BANKING_SYMBOLS,
+    "midcap50": MIDCAP_SYMBOLS,
+    "smallcap50": SMALLCAP_SYMBOLS,
+}
